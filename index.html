@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Printable Job Grid</title>
+<style>
+  body{font-family:Arial, sans-serif; margin:20px;}
+  .controls{margin-bottom:20px;}
+  input, button, textarea{padding:6px; margin-top:6px;}
+
+  table{width:100%; border-collapse:collapse; table-layout:fixed;}
+  th, td{border:1px solid #000; text-align:center; vertical-align:top;}
+
+  th{
+    background:#f0f0f0;
+    padding:8px;
+    font-weight:bold;
+    font-size:14px;
+  }
+
+  td{
+    height:1.2in;
+    position:relative;
+    padding:4px;
+  }
+
+  th[contenteditable]{outline:none}
+
+  /* Location box */
+  .location-box{
+    position:absolute;
+    top:4px;
+    right:4px;
+    border:1px solid #000;
+    font-size:10px;
+    padding:2px 4px;
+    background:#fff;
+    font-weight:bold;
+    min-width:22px;
+  }
+
+  @media print{
+    body{margin:0}
+    .controls{display:none}
+
+    table{page-break-inside:auto}
+
+    tr{
+      page-break-inside:avoid;
+      page-break-after:auto;
+    }
+
+    @page{
+      size:A4 portrait;
+      margin:1cm;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <label><strong>Number of columns:</strong></label><br>
+  <input type="number" id="colCount" min="1" max="12" value="4" />
+
+  <br><br>
+
+  <label><strong>Enter each person on a new line</strong></label><br>
+  <small>Format: name details location (example: Sal T200061 9F)</small><br>
+  <textarea id="entries" rows="12" cols="50" placeholder="Sal T200061 9F\nBob C123456 1B"></textarea>
+
+  <br><br>
+
+  <button onclick="generateGrid()">Generate Grid</button>
+  <button onclick="window.print()">Print</button>
+</div>
+
+<table id="grid"></table>
+
+<script>
+
+function generateGrid(){
+
+  const entries = document.getElementById('entries').value
+    .split('\n')
+    .map(e=>e.trim())
+    .filter(e=>e.length>0);
+
+  const colCount = parseInt(document.getElementById('colCount').value);
+
+  let parsed = entries.map(line => {
+
+    const parts = line.split(/\s+/);
+
+    let location = '';
+
+    if(parts.length > 1){
+      location = parts[parts.length-1];
+    }
+
+    const name = parts.slice(0, parts.length-1).join(' ');
+
+    return {name, location};
+
+  });
+
+  const groups = {};
+
+  parsed.forEach(p => {
+    const key = p.location || 'Other';
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  });
+
+  parsed = Object.keys(groups).sort().flatMap(k => groups[k]);
+
+  const table = document.getElementById('grid');
+  table.innerHTML='';
+
+  let index = 0;
+
+  while(index < parsed.length){
+
+    const headerRow = document.createElement('tr');
+    const jobRow = document.createElement('tr');
+
+    for(let c=0;c<colCount;c++){
+
+      const person = parsed[index];
+
+      const th = document.createElement('th');
+      th.contentEditable = true;
+      th.textContent = person ? person.name : '';
+      headerRow.appendChild(th);
+
+      const td = document.createElement('td');
+
+      if(person && person.location){
+        const loc = document.createElement('div');
+        loc.className = 'location-box';
+        loc.contentEditable = true;
+        loc.textContent = person.location;
+        td.appendChild(loc);
+      }
+
+      jobRow.appendChild(td);
+
+      index++;
+    }
+
+    table.appendChild(headerRow);
+    table.appendChild(jobRow);
+
+  }
+}
+
+</script>
+
+</body>
+</html>
