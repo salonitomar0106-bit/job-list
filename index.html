@@ -27,7 +27,6 @@
 
   th[contenteditable]{outline:none}
 
-  /* Location box */
   .location-box{
     position:absolute;
     top:4px;
@@ -67,12 +66,13 @@
   <br><br>
 
   <label><strong>Enter each person on a new line</strong></label><br>
-  <small>Format: name details location (example: Sal T200061 9F)</small><br>
-  <textarea id="entries" rows="12" cols="50" placeholder="Sal T200061 9F\nBob C123456 1B"></textarea>
+  <small>Format examples: Sal T200061 9F / Alice ICU / Bob</small><br>
+  <textarea id="entries" rows="12" cols="50" placeholder="Sal T200061 9F\nBob C123456 1B\nAlice ICU\nJohn"></textarea>
 
   <br><br>
 
   <button onclick="generateGrid()">Generate Grid</button>
+  <button onclick="copyYesterday()">Copy Yesterday's List</button>
   <button onclick="window.print()">Print</button>
 </div>
 
@@ -80,9 +80,60 @@
 
 <script>
 
+function isWard(token){
+
+  if(!token) return false;
+
+  const t = token.toUpperCase();
+
+  if(/^\d+[A-Z]$/.test(t)) return true;
+
+  const wards = [
+    'AMU','ICU','HDU','CCU','ED','ER','NICU','PICU','MICU'
+  ];
+
+  if(wards.includes(t)) return true;
+
+  return false;
+}
+
+function wardSortValue(ward){
+
+  if(!ward) return 9999;
+
+  const w = ward.toUpperCase();
+
+  const match = w.match(/^(\d+)([A-Z])$/);
+
+  if(match){
+    const floor = parseInt(match[1]);
+    const letter = match[2].charCodeAt(0) - 65;
+    return floor * 100 + letter;
+  }
+
+  const special = {
+    AMU:8000,
+    ED:8100,
+    ICU:8200,
+    HDU:8300,
+    CCU:8400,
+    NICU:8500,
+    PICU:8600,
+    MICU:8700
+  };
+
+  if(special[w]) return special[w];
+
+  return 9000;
+}
+
 function generateGrid(){
 
-  const entries = document.getElementById('entries').value
+  const entriesText = document.getElementById('entries').value;
+
+  localStorage.setItem('yesterdayList', entriesText);
+
+  const entries = entriesText
     .split('\n')
     .map(e=>e.trim())
     .filter(e=>e.length>0);
@@ -93,13 +144,19 @@ function generateGrid(){
 
     const parts = line.split(/\s+/);
 
+    let name = line;
     let location = '';
 
     if(parts.length > 1){
-      location = parts[parts.length-1];
-    }
 
-    const name = parts.slice(0, parts.length-1).join(' ');
+      const last = parts[parts.length-1];
+
+      if(isWard(last)){
+        location = last.toUpperCase();
+        name = parts.slice(0, parts.length-1).join(' ');
+      }
+
+    }
 
     return {name, location};
 
@@ -108,12 +165,25 @@ function generateGrid(){
   const groups = {};
 
   parsed.forEach(p => {
+
     const key = p.location || 'Other';
+
     if(!groups[key]) groups[key] = [];
+
     groups[key].push(p);
+
   });
 
-  parsed = Object.keys(groups).sort().flatMap(k => groups[k]);
+  const sortedWards = Object.keys(groups).sort((a,b)=>{
+
+    if(a === 'Other') return 1;
+    if(b === 'Other') return -1;
+
+    return wardSortValue(a) - wardSortValue(b);
+
+  });
+
+  parsed = sortedWards.flatMap(w => groups[w]);
 
   const table = document.getElementById('grid');
   table.innerHTML='';
@@ -137,22 +207,38 @@ function generateGrid(){
       const td = document.createElement('td');
 
       if(person && person.location){
+
         const loc = document.createElement('div');
         loc.className = 'location-box';
         loc.contentEditable = true;
         loc.textContent = person.location;
         td.appendChild(loc);
+
       }
 
       jobRow.appendChild(td);
 
       index++;
+
     }
 
     table.appendChild(headerRow);
     table.appendChild(jobRow);
 
   }
+
+}
+
+function copyYesterday(){
+
+  const saved = localStorage.getItem('yesterdayList');
+
+  if(saved){
+    document.getElementById('entries').value = saved;
+  } else {
+    alert('No previous list saved yet.');
+  }
+
 }
 
 </script>
